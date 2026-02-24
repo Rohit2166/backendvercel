@@ -1,62 +1,37 @@
 const mongoose = require("mongoose");
 
-const groundSchema = new mongoose.Schema({
+const schema = new mongoose.Schema({
 
-  name: {
-    type: String,
-    required: true
-  },
+ name: String,
 
-  address: {
-    type: String,
-    required: true
-  },
+ address: String,
 
-  location: {
-    type: String,
-    required: true
-  },
+ location: String,
 
-  price: {
-    type: Number,
-    required: true
-  },
+ price: Number,
 
-  sport: {
-    type: String,
-    enum: ["cricket", "badminton", "basketball", "pickleball", "tennis"],
-    required: true
-  },
+ sport: String,
 
-  image: String,
+ image: String,
 
-  images: [String],
+ images: [String],
 
-  description: String,
+ description: String,
 
-  ownerId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true
-  },
+ ownerId: {
 
-  availableSlots: [
-    {
-      day: String,
-      slots: [String]
-    }
-  ],
+  type: mongoose.Schema.Types.ObjectId,
 
-  isAvailable: {
-    type: Boolean,
-    default: true
-  },
+  ref: "User"
 
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
+ }
+
+},
+
+{
+
+ timestamps: true
 
 });
 
-module.exports = mongoose.model("Ground", groundSchema);
+module.exports = mongoose.model("Ground", schema);

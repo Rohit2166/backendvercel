@@ -1,37 +1,35 @@
 const mongoose = require("mongoose");
 
-const turfSchema = new mongoose.Schema({
+const schema = new mongoose.Schema({
 
-  name: String,
+ name: String,
 
-  location: String,
+ location: String,
 
-  address: String,
+ address: String,
 
-  sport: String,
+ sport: String,
 
-  price: Number,
+ price: Number,
 
-  description: String,
+ description: String,
 
-  images: [String],
+ images: [String],
 
-  owner: {
+ owner: {
 
-    type: mongoose.Schema.Types.ObjectId,
+  type: mongoose.Schema.Types.ObjectId,
 
-    ref: "User"
+  ref: "User"
 
-  }
+ }
 
 },
 
 {
 
-  timestamps: true
+ timestamps: true
 
 });
 
-
-
-module.exports = mongoose.model("Turf", turfSchema);
+module.exports = mongoose.model("Turf", schema);

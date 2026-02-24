@@ -1,50 +1,48 @@
-const express = require("express");
-
-const router = express.Router();
+const router = require("express").Router();
 
 const Contact = require("../models/Contact");
 
 
+// Create contact message
 router.post("/", async (req, res) => {
-
-try {
-
-const contact = new Contact({
-
-name: req.body.name,
-
-email: req.body.email,
-
-message: req.body.message
-
+  try {
+    const { name, email, message } = req.body;
+    
+    if (!name || !email || !message) {
+      return res.status(400).json({ 
+        message: "Name, email, and message are required" 
+      });
+    }
+    
+    const data = await Contact.create({
+      name,
+      email,
+      message
+    });
+    
+    res.json({
+      success: true,
+      message: "Message sent successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: error.message 
+    });
+  }
 });
 
-await contact.save();
 
-res.json({
-
-success: true,
-
-message: "Contact saved"
-
-});
-
-}
-
-catch (error) {
-
-console.log(error);
-
-res.status(500).json({
-
-success: false,
-
-message: error.message
-
-});
-
-}
-
+// Get all contacts (admin only - for future use)
+router.get("/", async (req, res) => {
+  try {
+    const contacts = await Contact.find().sort({ createdAt: -1 });
+    res.json(contacts);
+  } catch (error) {
+    res.status(500).json({ 
+      message: error.message 
+    });
+  }
 });
 
 

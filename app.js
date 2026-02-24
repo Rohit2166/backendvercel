@@ -1,43 +1,38 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const path = require("path");
 
-// ✅ Import cached DB connection (for Vercel)
+dotenv.config();
+
 const connectDB = require("./config/db");
 
-// Routes
 const userRoutes = require("./routes/userRoutes");
 const groundRoutes = require("./routes/groundRoutes");
 const turfRoutes = require("./routes/turfRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const contactRoutes = require("./routes/contactRoutes");
 
-dotenv.config();
-
 const app = express();
 
-// ✅ Connect MongoDB
-connectDB();
 
+// ✅ MIDDLEWARE
 
-// ✅ CORS (allow frontend)
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "*",
+  origin: "*",
   credentials: true
 }));
 
-
-// ✅ Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 
-// ✅ Static folder
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// ✅ SERVE STATIC FILES (UPLOADS)
+app.use("/uploads", express.static("uploads"));
 
 
-// ✅ Routes
+
+// ✅ ROUTES
+
 app.use("/api/users", userRoutes);
 
 app.use("/api/grounds", groundRoutes);
@@ -49,34 +44,43 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/contact", contactRoutes);
 
 
-// ✅ Test routes
+
+// ✅ TEST ROUTE
+
 app.get("/", (req, res) => {
-
-  res.send("CRICBOX Backend is Running 🚀");
-
+  res.send("CRICBOX Backend Running Successfully 🚀");
 });
 
 
-app.get("/test", (req, res) => {
-
-  res.send("Backend + DB working");
-
+// ✅ CONNECT DATABASE MIDDLEWARE (ensures connection before each request in serverless)
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("Database connection error:", err.message);
+    res.status(503).json({ message: "Database service unavailable" });
+  }
 });
 
 
-// ✅ Run locally only
-const PORT = process.env.PORT || 5000;
+// ✅ LOCAL RUN
 
 if (process.env.NODE_ENV !== "production") {
-
-  app.listen(PORT, () => {
-
-    console.log(`Server running on port ${PORT}`);
-
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, async () => {
+    console.log("Server running on port", PORT);
+    try {
+      await connectDB();
+      console.log("Database connected successfully");
+    } catch (err) {
+      console.error("Failed to connect to database:", err.message);
+    }
   });
-
 }
 
 
-// ✅ Export for Vercel
+
+// ✅ EXPORT FOR VERCEL
+
 module.exports = app;

@@ -1,97 +1,39 @@
-const express = require("express");
-const router = express.Router();
+const router = require("express").Router();
 
 const Ground = require("../models/Ground");
 
-const multer = require("multer");
-
-const path = require("path");
-
-const authMiddleware = require("../middleware/authMiddleware");
-
-const storage = multer.diskStorage({
-
-  destination: "uploads",
-
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  }
-
-});
-
-const upload = multer({ storage });
-
-const uploadMultiple = multer({ storage }).array("images", 10);
+const auth = require("../middleware/authMiddleware");
 
 
-
-router.post("/add", authMiddleware, uploadMultiple, async(req,res)=>{
-
+// Add ground (owner only)
+router.post("/add", auth, async (req, res) => {
   try {
-    const { name, address, location, price, sport, description } = req.body;
-
-    const images = req.files ? req.files.map(f => f.filename) : [];
-    const primaryImage = images.length > 0 ? images[0] : null;
-
-    const ground = new Ground({
-      name,
-      address,
-      location,
-      price,
-      sport,
-      description,
-      image: primaryImage,
-      images: images,
+    const ground = await Ground.create({
+      ...req.body,
       ownerId: req.userId
     });
-
-    await ground.save();
-
-    res.status(201).json({
-      message: "Ground added successfully",
-      ground
-    });
+    res.json(ground);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-
 });
 
 
-
-
-router.get("/", async(req,res)=>{
-
+// Get all grounds (public)
+router.get("/", async (req, res) => {
   try {
-    const grounds = await Ground.find().populate("ownerId", "name email phone");
-    res.json(grounds);
+    const data = await Ground.find();
+    res.json(data);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-
 });
 
 
-
-
-router.get("/sport/:sport", async(req,res)=>{
-
-  try {
-    const grounds = await Ground.find({ sport: req.params.sport }).populate("ownerId", "name email phone");
-    res.json(grounds);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-
-});
-
-
-
-
+// Get ground by ID
 router.get("/:id", async (req, res) => {
-
   try {
-    const ground = await Ground.findById(req.params.id).populate("ownerId", "name email phone");
+    const ground = await Ground.findById(req.params.id);
     if (!ground) {
       return res.status(404).json({ message: "Ground not found" });
     }
@@ -99,82 +41,67 @@ router.get("/:id", async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-
 });
 
 
-
-
-router.get("/owner/grounds", authMiddleware, async(req,res)=>{
-
+// Get grounds by sport type
+router.get("/sport/:sport", async (req, res) => {
   try {
-    const grounds = await Ground.find({ ownerId: req.userId });
+    const { sport } = req.params;
+    const grounds = await Ground.find({ 
+      sport: sport.toLowerCase() 
+    });
     res.json(grounds);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-
 });
 
 
-//  for update 
-
-router.put("/:id", authMiddleware, uploadMultiple, async(req,res)=>{
-
+// Update ground
+router.put("/:id", auth, async (req, res) => {
   try {
-    const { name, address, location, price, sport, description } = req.body;
-
     const ground = await Ground.findById(req.params.id);
-
-    if (ground.ownerId.toString() !== req.userId) {
-      return res.status(403).json({ message: "Unauthorized" });
+    if (!ground) {
+      return res.status(404).json({ message: "Ground not found" });
     }
-
-    if (name) ground.name = name;
-    if (address) ground.address = address;
-    if (location) ground.location = location;
-    if (price) ground.price = price;
-    if (sport) ground.sport = sport;
-    if (description) ground.description = description;
     
-    // Handle multiple images
-    if (req.files && req.files.length > 0) {
-      const newImages = req.files.map(f => f.filename);
-      ground.images = newImages;
-      ground.image = newImages[0];
+    // Check ownership
+    if (ground.ownerId && ground.ownerId.toString() !== req.userId) {
+      return res.status(403).json({ message: "Not authorized" });
     }
-
-    await ground.save();
-
-    res.json({
-      message: "Ground updated successfully",
-      ground
-    });
+    
+    const updatedGround = await Ground.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    res.json(updatedGround);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-
 });
 
 
 // Delete ground
-
-router.delete("/:id", authMiddleware, async(req,res)=>{
-
+router.delete("/:id", auth, async (req, res) => {
   try {
     const ground = await Ground.findById(req.params.id);
-
-    if (ground.ownerId.toString() !== req.userId) {
-      return res.status(403).json({ message: "Unauthorized" });
+    if (!ground) {
+      return res.status(404).json({ message: "Ground not found" });
     }
-
+    
+    // Check ownership
+    if (ground.ownerId && ground.ownerId.toString() !== req.userId) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    
     await Ground.findByIdAndDelete(req.params.id);
-
     res.json({ message: "Ground deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-
 });
+
 
 module.exports = router;

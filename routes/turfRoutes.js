@@ -1,68 +1,106 @@
-const express = require("express");
-
-const router = express.Router();
+const router = require("express").Router();
 
 const Turf = require("../models/Turf");
 
 const auth = require("../middleware/authMiddleware");
 
 
-// ADD TURF
-
-router.post("/", auth, async (req,res)=>{
-
-  try{
-
-    const images = JSON.parse(req.body.images || "[]");
-
-    const turf = new Turf({
-
-      name:req.body.name,
-      location:req.body.location,
-      address:req.body.address,
-      sport:req.body.sport,
-      price:req.body.price,
-      description:req.body.description,
-      images:images,
-      owner:req.userId
-
+// Create new turf
+router.post("/", auth, async (req, res) => {
+  try {
+    const turf = await Turf.create({
+      ...req.body,
+      owner: req.userId
     });
-
-    await turf.save();
-
-    res.json({message:"Turf Added"});
-
+    res.json(turf);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
-
-  catch(err){
-
-    console.log(err);
-
-    res.status(500).json({message:err.message});
-
-  }
-
 });
 
 
-// GET OWNER TURFS
-
-router.get("/owner", auth, async(req,res)=>{
-
-  try{
-
-    const turfs = await Turf.find({owner:req.userId});
-
+// Get all turfs (public)
+router.get("/", async (req, res) => {
+  try {
+    const turfs = await Turf.find();
     res.json(turfs);
-
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
-
-  catch(err){
-
-    res.status(500).json({message:err.message});
-
-  }
-
 });
+
+
+// Get turf by ID
+router.get("/:id", async (req, res) => {
+  try {
+    const turf = await Turf.findById(req.params.id);
+    if (!turf) {
+      return res.status(404).json({ message: "Turf not found" });
+    }
+    res.json(turf);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// Get owner's turfs
+router.get("/owner", auth, async (req, res) => {
+  try {
+    const turfs = await Turf.find({
+      owner: req.userId
+    });
+    res.json(turfs);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// Update turf
+router.put("/:id", auth, async (req, res) => {
+  try {
+    const turf = await Turf.findById(req.params.id);
+    if (!turf) {
+      return res.status(404).json({ message: "Turf not found" });
+    }
+    
+    // Check ownership
+    if (turf.owner.toString() !== req.userId) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    
+    const updatedTurf = await Turf.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    res.json(updatedTurf);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// Delete turf
+router.delete("/:id", auth, async (req, res) => {
+  try {
+    const turf = await Turf.findById(req.params.id);
+    if (!turf) {
+      return res.status(404).json({ message: "Turf not found" });
+    }
+    
+    // Check ownership
+    if (turf.owner.toString() !== req.userId) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    
+    await Turf.findByIdAndDelete(req.params.id);
+    res.json({ message: "Turf deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 
 module.exports = router;
