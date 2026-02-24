@@ -40,9 +40,12 @@ app.use("/api/contact", contactRoutes);
 //   res.sendFile(path.resolve(_dirname,"CRIC-BOX","dist","index.html"));
 // });
 
-mongoose.connect(process.env.MONGO_URL || "mongodb://localhost:27017/cricbox")
-  .then(() => console.log(" MongoDB Connected"))
-  .catch(err => console.log(" MongoDB Error: ", err));
+mongoose.connect(process.env.MONGO_URL, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => console.log("MongoDB Connected"))
+.catch(err => console.log(err));
 
 
 module.exports = app;
