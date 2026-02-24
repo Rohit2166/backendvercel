@@ -44,29 +44,27 @@ app.use("/api/contact", contactRoutes);
 //   res.sendFile(path.resolve(_dirname,"CRIC-BOX","dist","index.html"));
 // });
 
-let isConnected = false;
-
 const connectDB = async () => {
-  if (isConnected) {
-    console.log("MongoDB already connected");
-    return;
-  }
-
   try {
-    const db = await mongoose.connect(process.env.MONGO_URL, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-
-    isConnected = db.connections[0].readyState;
+    await mongoose.connect(process.env.MONGO_URL);
     console.log("MongoDB Connected Successfully");
   } catch (error) {
-    console.error("MongoDB connection error:", error);
+    console.log("MongoDB connection error:", error);
   }
 };
 
 connectDB();
 
+const PORT = process.env.PORT || 5000;
+
+// Only run server locally, not on Vercel
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+// Export for Vercel
 module.exports = app;
 
  
