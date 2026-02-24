@@ -1,15 +1,14 @@
-const express = require("express");
 
+const express = require("express");
 const router = express.Router();
 
 const Turf = require("../models/Turf");
-
-const auth = require("../middleware/authMiddleware");
-
-const upload = require("../middleware/upload");
+const authMiddleware = require("../middleware/authMiddleware");
 
 
-router.post("/", auth, upload.array("images"), async (req, res) => {
+// ✅ ADD TURF (SAFE)
+
+router.post("/", authMiddleware, async (req, res) => {
 
   try {
 
@@ -45,6 +44,8 @@ router.post("/", auth, upload.array("images"), async (req, res) => {
 
   catch (err) {
 
+    console.log(err);
+
     res.status(500).json({
 
       message: err.message
@@ -54,12 +55,20 @@ router.post("/", auth, upload.array("images"), async (req, res) => {
   }
 
 });
-// GET OWNER TURFS
+
+
+
+// ✅ GET OWNER TURFS
+
 router.get("/owner", authMiddleware, async (req, res) => {
 
   try {
 
-    const turfs = await Turf.find({ owner: req.userId });
+    const turfs = await Turf.find({
+
+      owner: req.userId
+
+    });
 
     res.json(turfs);
 
@@ -67,32 +76,18 @@ router.get("/owner", authMiddleware, async (req, res) => {
 
   catch (err) {
 
-    res.status(500).json({ message: err.message });
+    console.log(err);
+
+    res.status(500).json({
+
+      message: err.message
+
+    });
 
   }
 
 });
 
-
-// DELETE TURF
-
-router.delete("/:id", authMiddleware, async (req, res) => {
-
-  try {
-
-    await Turf.findByIdAndDelete(req.params.id);
-
-    res.json({ message: "Deleted" });
-
-  }
-
-  catch (err) {
-
-    res.status(500).json({ message: err.message });
-
-  }
-
-});
 
 
 module.exports = router;
