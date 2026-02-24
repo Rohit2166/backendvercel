@@ -24,6 +24,10 @@ app.get("/", (req, res) => {
   res.send("CRICBOX Backend is Running 🚀");
 });
 
+app.get("/test", (req, res) => {
+  res.send("Backend + DB working");
+});
+
 
 const userRoutes = require("./routes/userRoutes");
 const groundRoutes = require("./routes/groundRoutes");
@@ -40,13 +44,28 @@ app.use("/api/contact", contactRoutes);
 //   res.sendFile(path.resolve(_dirname,"CRIC-BOX","dist","index.html"));
 // });
 
-mongoose.connect(process.env.MONGO_URL, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log("MongoDB Connected"))
-.catch(err => console.log(err));
+let isConnected = false;
 
+const connectDB = async () => {
+  if (isConnected) {
+    console.log("MongoDB already connected");
+    return;
+  }
+
+  try {
+    const db = await mongoose.connect(process.env.MONGO_URL, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
+    isConnected = db.connections[0].readyState;
+    console.log("MongoDB Connected Successfully");
+  } catch (error) {
+    console.error("MongoDB connection error:", error);
+  }
+};
+
+connectDB();
 
 module.exports = app;
 
