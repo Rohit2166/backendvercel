@@ -3,33 +3,31 @@ const mongoose = require("mongoose");
 let cached = global.mongoose;
 
 if (!cached) {
+
   cached = global.mongoose = { conn: null, promise: null };
+
 }
 
 async function connectDB() {
 
-  if (cached.conn) {
-    return cached.conn;
-  }
+  if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
 
     cached.promise = mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    })
-    .then((mongoose) => {
-      console.log("MongoDB Connected");
-      return mongoose;
-    })
-    .catch((err) => {
-      console.log("MongoDB Error:", err);
+
+      bufferCommands: false,
+
     });
 
   }
 
   cached.conn = await cached.promise;
+
+  console.log("MongoDB Connected");
+
   return cached.conn;
+
 }
 
 module.exports = connectDB;
