@@ -20,6 +20,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+app.get("/", (req, res) => {
+  res.send("CRICBOX Backend is Running 🚀");
+});
+
 
 const userRoutes = require("./routes/userRoutes");
 const groundRoutes = require("./routes/groundRoutes");
