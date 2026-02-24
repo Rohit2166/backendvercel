@@ -3,14 +3,11 @@
   "version": "1.0.0",
   "description": "",
   "main": "app.js",
-  
   "scripts": {
-   
     "dev": "nodemon backend/app.js",
-    "build":"npm install && npm install --prefix frontend/CRIC-BOX && npm run build --prefix",
+    "build": "npm install && npm install --prefix frontend/CRIC-BOX && npm run build --prefix",
     "start": "node app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
-    
   },
   "keywords": [],
   "author": "",
@@ -23,6 +20,7 @@
     "express": "^5.2.1",
     "framer-motion": "^12.34.3",
     "jsonwebtoken": "^9.0.3",
+    "mongodb": "^7.1.0",
     "mongoose": "^9.2.1",
     "multer": "^2.0.2",
     "nodemailer": "^8.0.1",
