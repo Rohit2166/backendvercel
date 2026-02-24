@@ -1,0 +1,13 @@
+node_modules
+
+frontend/CRIC-BOX/node_modules
+backend/node_modules
+
+backend/.env
+backend/.env.local
+frontend/.env
+frontend/.env.local
+backend/.env.*.local
+
+frontend/dist
+backend/dist
