@@ -11,3 +11,4 @@ backend/.env.*.local
 
 frontend/dist
 backend/dist
+uploads/

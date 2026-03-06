@@ -19,11 +19,9 @@ const schema = new mongoose.Schema({
  description: String,
 
  ownerId: {
-
-  type: mongoose.Schema.Types.ObjectId,
-
-  ref: "User"
-
+   type: mongoose.Schema.Types.ObjectId,
+   ref: "User",
+   default: null
  }
 
 },
@@ -33,5 +31,17 @@ const schema = new mongoose.Schema({
  timestamps: true
 
 });
+
+// Add a virtual for getting ownerId as string
+schema.virtual('ownerIdString').get(function() {
+  if (this.ownerId) {
+    return this.ownerId.toString();
+  }
+  return null;
+});
+
+// Ensure virtuals are included in JSON
+schema.set('toJSON', { virtuals: true });
+schema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model("Ground", schema);

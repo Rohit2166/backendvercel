@@ -17,18 +17,48 @@ const app = express();
 
 // ✅ MIDDLEWARE
 
+// CORS - allow all origins for development
 app.use(cors({
   origin: "*",
-  credentials: true
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Note: OPTIONS preflight is handled by cors() middleware above
+
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 
 // ✅ SERVE STATIC FILES (UPLOADS)
 app.use("/uploads", express.static("uploads"));
 
+
+
+// ✅ TEST ROUTE (before auth middleware)
+app.get("/", (req, res) => {
+  res.send("CRICBOX Backend Running Successfully 🚀");
+});
+
+
+
+// ✅ CONNECT DATABASE MIDDLEWARE (ensures connection before each request in serverless)
+let dbConnected = false;
+
+app.use(async (req, res, next) => {
+  try {
+    if (!dbConnected) {
+      await connectDB();
+      dbConnected = true;
+      console.log("Database connected");
+    }
+    next();
+  } catch (err) {
+    console.error("Database connection error:", err.message);
+    // Don't block the request, continue anyway
+    next();
+  }
+});
 
 
 // ✅ ROUTES
@@ -44,26 +74,6 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/contact", contactRoutes);
 
 
-
-// ✅ TEST ROUTE
-
-app.get("/", (req, res) => {
-  res.send("CRICBOX Backend Running Successfully 🚀");
-});
-
-
-// ✅ CONNECT DATABASE MIDDLEWARE (ensures connection before each request in serverless)
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    console.error("Database connection error:", err.message);
-    res.status(503).json({ message: "Database service unavailable" });
-  }
-});
-
-
 // ✅ LOCAL RUN
 
 if (process.env.NODE_ENV !== "production") {
@@ -73,6 +83,7 @@ if (process.env.NODE_ENV !== "production") {
     try {
       await connectDB();
       console.log("Database connected successfully");
+      dbConnected = true;
     } catch (err) {
       console.error("Failed to connect to database:", err.message);
     }

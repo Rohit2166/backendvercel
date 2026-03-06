@@ -1,19 +1,41 @@
 const router = require("express").Router();
 
 const Ground = require("../models/Ground");
+const User = require("../models/User");
+const mongoose = require("mongoose");
 
 const auth = require("../middleware/authMiddleware");
 
+const upload = require("../middleware/upload");
 
-// Add ground (owner only)
-router.post("/add", auth, async (req, res) => {
+
+// Add ground with image upload (owner only)
+router.post("/add", auth, upload.array("images", 5), async (req, res) => {
   try {
+    // Validate userId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(req.userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+    
+    // Get image filenames if files were uploaded
+    const images = req.files ? req.files.map(file => file.filename) : [];
+    
+    console.log("Creating ground with ownerId:", req.userId);
+    
+    // Ensure ownerId is a proper ObjectId
+    const ownerIdObject = new mongoose.Types.ObjectId(req.userId);
+    
     const ground = await Ground.create({
       ...req.body,
-      ownerId: req.userId
+      ownerId: ownerIdObject,
+      images: images
     });
+    
+    console.log("Ground created:", ground._id, "ownerId:", ground.ownerId);
+    
     res.json(ground);
   } catch (error) {
+    console.error("Error creating ground:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -25,20 +47,42 @@ router.get("/", async (req, res) => {
     const data = await Ground.find();
     res.json(data);
   } catch (error) {
+    console.error("Error fetching grounds:", error);
     res.status(500).json({ message: error.message });
   }
 });
 
 
-// Get ground by ID
-router.get("/:id", async (req, res) => {
+// Get owner's turfs
+router.get("/owner", auth, async (req, res) => {
   try {
-    const ground = await Ground.findById(req.params.id);
-    if (!ground) {
-      return res.status(404).json({ message: "Ground not found" });
-    }
-    res.json(ground);
+    console.log("Fetching grounds for userId:", req.userId);
+    
+    let grounds = [];
+    
+    // First, get ALL grounds and filter in memory to avoid ObjectId casting issues
+    const allGrounds = await Ground.find({});
+    
+    // Filter grounds that belong to this user
+    // Handle both ObjectId and string ownerId
+    const userIdStr = req.userId.toString();
+    
+    grounds = allGrounds.filter(ground => {
+      if (!ground.ownerId) return false;
+      
+      const ownerIdStr = ground.ownerId.toString();
+      
+      // Match by ObjectId string or string comparison
+      return ownerIdStr === userIdStr || 
+             ownerIdStr === "owner" || 
+             ownerIdStr === req.userId;
+    });
+    
+    console.log("Found grounds:", grounds.length);
+    
+    res.json(grounds);
   } catch (error) {
+    console.error("Error fetching owner grounds:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -53,31 +97,64 @@ router.get("/sport/:sport", async (req, res) => {
     });
     res.json(grounds);
   } catch (error) {
+    console.error("Error fetching grounds by sport:", error);
     res.status(500).json({ message: error.message });
   }
 });
 
 
-// Update ground
-router.put("/:id", auth, async (req, res) => {
+// Get ground by ID
+router.get("/:id", async (req, res) => {
+  try {
+    const ground = await Ground.findById(req.params.id);
+    if (!ground) {
+      return res.status(404).json({ message: "Ground not found" });
+    }
+    res.json(ground);
+  } catch (error) {
+    console.error("Error fetching ground:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// Update ground with image upload
+router.put("/:id", auth, upload.array("images", 5), async (req, res) => {
   try {
     const ground = await Ground.findById(req.params.id);
     if (!ground) {
       return res.status(404).json({ message: "Ground not found" });
     }
     
-    // Check ownership
-    if (ground.ownerId && ground.ownerId.toString() !== req.userId) {
+    // Check ownership - handle both ObjectId and string
+    let ownerId = null;
+    if (ground.ownerId) {
+      ownerId = ground.ownerId.toString();
+    }
+    
+    const userIdStr = req.userId ? req.userId.toString() : null;
+    
+    if (ownerId && userIdStr && ownerId !== userIdStr && ownerId !== "owner") {
       return res.status(403).json({ message: "Not authorized" });
+    }
+    
+    // Get new image filenames if files were uploaded
+    const newImages = req.files ? req.files.map(file => file.filename) : [];
+    
+    // Merge with existing images if any
+    let updateData = { ...req.body };
+    if (newImages.length > 0) {
+      updateData.images = [...(ground.images || []), ...newImages];
     }
     
     const updatedGround = await Ground.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true }
     );
     res.json(updatedGround);
   } catch (error) {
+    console.error("Error updating ground:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -91,14 +168,59 @@ router.delete("/:id", auth, async (req, res) => {
       return res.status(404).json({ message: "Ground not found" });
     }
     
-    // Check ownership
-    if (ground.ownerId && ground.ownerId.toString() !== req.userId) {
+    // Check ownership - handle both ObjectId and string
+    let ownerId = null;
+    if (ground.ownerId) {
+      ownerId = ground.ownerId.toString();
+    }
+    
+    const userIdStr = req.userId ? req.userId.toString() : null;
+    
+    if (ownerId && userIdStr && ownerId !== userIdStr && ownerId !== "owner") {
       return res.status(403).json({ message: "Not authorized" });
     }
     
     await Ground.findByIdAndDelete(req.params.id);
     res.json({ message: "Ground deleted successfully" });
   } catch (error) {
+    console.error("Error deleting ground:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// Migration endpoint to fix existing grounds with string ownerId
+router.post("/migrate", auth, async (req, res) => {
+  try {
+    // Only allow owner users
+    const user = await User.findById(req.userId);
+    if (!user || (user.role !== "owner" && user.role !== "admin")) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    
+    // Find all grounds with string ownerId
+    const invalidGrounds = await Ground.find({ 
+      ownerId: { $type: "string" }
+    });
+    
+    console.log(`Found ${invalidGrounds.length} grounds with string ownerId`);
+    
+    // Update each ground to set ownerId to null
+    let updatedCount = 0;
+    for (const ground of invalidGrounds) {
+      if (ground.ownerId === "owner" || ground.ownerId === "") {
+        ground.ownerId = null;
+        await ground.save();
+        updatedCount++;
+      }
+    }
+    
+    res.json({ 
+      message: "Migration completed", 
+      updatedCount 
+    });
+  } catch (error) {
+    console.error("Migration error:", error);
     res.status(500).json({ message: error.message });
   }
 });
