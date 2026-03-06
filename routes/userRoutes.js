@@ -150,7 +150,7 @@ const auth = require("../middleware/authMiddleware");
 const generateToken = (userId) => {
   return jwt.sign(
     { id: userId },
-    process.env.JWT_SECRET,
+    process.env.JWT_SECRET || "defaultsecretkey",
     { expiresIn: "7d" }
   );
 };
