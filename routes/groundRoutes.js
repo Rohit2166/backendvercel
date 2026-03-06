@@ -6,8 +6,16 @@ const mongoose = require("mongoose");
 
 const auth = require("../middleware/authMiddleware");
 
-const upload = require("../middleware/upload");
+const { upload, cloudinary } = require("../middleware/upload");
 
+// Helper function to get image URL from Cloudinary file
+const getImageUrl = (file) => {
+  if (!file) return null;
+  // If it's already a URL (Cloudinary), use it
+  if (file.path) return file.path;
+  if (file.url) return file.url;
+  return file.filename;
+};
 
 // Add ground with image upload (owner only)
 router.post("/add", auth, upload.array("images", 5), async (req, res) => {
@@ -17,10 +25,11 @@ router.post("/add", auth, upload.array("images", 5), async (req, res) => {
       return res.status(400).json({ message: "Invalid user ID" });
     }
     
-    // Get image filenames if files were uploaded
-    const images = req.files ? req.files.map(file => file.filename) : [];
+    // Get image URLs if files were uploaded (Cloudinary returns path as URL)
+    const images = req.files ? req.files.map(file => getImageUrl(file)) : [];
     
     console.log("Creating ground with ownerId:", req.userId);
+    console.log("Images uploaded:", images);
     
     // Ensure ownerId is a proper ObjectId
     const ownerIdObject = new mongoose.Types.ObjectId(req.userId);
@@ -138,8 +147,8 @@ router.put("/:id", auth, upload.array("images", 5), async (req, res) => {
       return res.status(403).json({ message: "Not authorized" });
     }
     
-    // Get new image filenames if files were uploaded
-    const newImages = req.files ? req.files.map(file => file.filename) : [];
+    // Get new image URLs if files were uploaded
+    const newImages = req.files ? req.files.map(file => getImageUrl(file)) : [];
     
     // Merge with existing images if any
     let updateData = { ...req.body };
@@ -178,6 +187,19 @@ router.delete("/:id", auth, async (req, res) => {
     
     if (ownerId && userIdStr && ownerId !== userIdStr && ownerId !== "owner") {
       return res.status(403).json({ message: "Not authorized" });
+    }
+    
+    // Delete images from Cloudinary if they exist
+    if (ground.images && ground.images.length > 0) {
+      for (const imageUrl of ground.images) {
+        try {
+          // Extract public ID from Cloudinary URL
+          const publicId = imageUrl.split('/').pop().split('.')[0];
+          await cloudinary.uploader.destroy(`cricbox/${publicId}`);
+        } catch (err) {
+          console.error("Error deleting image from Cloudinary:", err);
+        }
+      }
     }
     
     await Ground.findByIdAndDelete(req.params.id);
