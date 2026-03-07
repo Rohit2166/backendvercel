@@ -16,11 +16,20 @@ const getImageUrl = (file) => {
   if (file.secure_url) return file.secure_url;
   
   // If it's already a full URL (Cloudinary HTTP), use it
-  if (file.path) return file.path;
   if (file.url) return file.url;
   
-  // For disk storage, it returns just the filename
-  return file.filename;
+  // For disk storage, it returns just the filename - need to construct URL
+  if (file.filename) {
+    // Check if it's a full path or just a filename
+    if (file.path && file.path.startsWith('http')) {
+      return file.path;
+    }
+    // For disk storage on Vercel, this won't work - return null
+    // Only Cloudinary URLs will work on Vercel
+    return null;
+  }
+  
+  return null;
 };
 
 // Add ground with image upload (owner only)

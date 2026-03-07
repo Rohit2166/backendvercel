@@ -1,31 +1,16 @@
 const multer = require("multer");
 const path = require("path");
 
-// Create upload middleware with Cloudinary support
+// Create upload middleware
 let upload;
 let cloudinary = null;
 
-// Check if cloudinary credentials are configured
-const cloudinaryConfigured = !!(
-  process.env.CLOUDINARY_CLOUD_NAME && 
-  process.env.CLOUDINARY_API_KEY && 
-  process.env.CLOUDINARY_API_SECRET
-);
+// Cloudinary configuration - check for environment variables
+const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+const apiKey = process.env.CLOUDINARY_API_KEY;
+const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
-console.log("Cloudinary check - Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME ? "Set" : "Not Set");
-console.log("Cloudinary check - API Key:", process.env.CLOUDINARY_API_KEY ? "Set" : "Not Set");
-console.log("Cloudinary check - API Secret:", process.env.CLOUDINARY_API_SECRET ? "Set" : "Not Set");
-
-// Set up disk storage as fallback
-const diskStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
-});
-
+// File filter for images only
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith("image/")) {
     cb(null, true);
@@ -34,25 +19,16 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Default to disk storage first
-upload = multer({ 
-  storage: diskStorage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
-  }
-});
-
-// Try to set up cloudinary
-if (cloudinaryConfigured) {
+// Set up Cloudinary storage if credentials are available
+if (cloudName && apiKey && apiSecret) {
   try {
     const { CloudinaryStorage } = require("multer-storage-cloudinary");
     cloudinary = require("cloudinary").v2;
     
     cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
     });
 
     const cloudStorage = new CloudinaryStorage({
@@ -60,7 +36,7 @@ if (cloudinaryConfigured) {
       params: {
         folder: "cricbox",
         allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
-        transformation: [{ width: 1200, height: 800, crop: "limit" }]
+        transformation: [{ width: 1200, height: 1200, crop: "limit" }]
       },
     });
 
@@ -68,19 +44,51 @@ if (cloudinaryConfigured) {
       storage: cloudStorage,
       fileFilter: fileFilter,
       limits: {
-        fileSize: 10 * 1024 * 1024,
+        fileSize: 10 * 1024 * 1024, // 10MB
       }
     });
     
-    console.log("✅ Cloudinary storage configured successfully");
+    console.log("✅ Cloudinary storage configured");
   } catch (err) {
-    console.log("⚠️ Cloudinary setup failed, using disk storage:", err.message);
+    console.log("⚠️ Cloudinary setup failed:", err.message);
+    // Fall back to disk storage
+    const diskStorage = multer.diskStorage({
+      destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+      },
+      filename: function (req, file, cb) {
+        cb(null, Date.now() + path.extname(file.originalname));
+      }
+    });
+    upload = multer({ 
+      storage: diskStorage,
+      fileFilter: fileFilter,
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      }
+    });
   }
 } else {
-  console.log("⚠️ Cloudinary not configured - using disk storage");
+  console.log("⚠️ Cloudinary credentials not found - using disk storage (may not work on Vercel)");
+  // Still set up disk storage as fallback for local development
+  const diskStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+      cb(null, Date.now() + path.extname(file.originalname));
+    }
+  });
+  upload = multer({ 
+    storage: diskStorage,
+    fileFilter: fileFilter,
+    limits: {
+      fileSize: 10 * 1024 * 1024,
+    }
+  });
 }
 
-// Export for both default and named exports
+// Export
 module.exports = upload;
 module.exports.upload = upload;
 module.exports.cloudinary = cloudinary;

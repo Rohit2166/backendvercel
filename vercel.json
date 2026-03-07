@@ -8,27 +8,7 @@
   ],
   "routes": [
     {
-      "src": "/api/users/(.*)",
-      "dest": "/app.js"
-    },
-    {
-      "src": "/api/grounds/(.*)",
-      "dest": "/app.js"
-    },
-    {
-      "src": "/api/turfs/(.*)",
-      "dest": "/app.js"
-    },
-    {
-      "src": "/api/bookings/(.*)",
-      "dest": "/app.js"
-    },
-    {
-      "src": "/api/contact/(.*)",
-      "dest": "/app.js"
-    },
-    {
-      "src": "/api/health",
+      "src": "/api/(.*)",
       "dest": "/app.js"
     },
     {
