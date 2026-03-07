@@ -11,9 +11,15 @@ const { upload, cloudinary } = require("../middleware/upload");
 // Helper function to get image URL from Cloudinary file
 const getImageUrl = (file) => {
   if (!file) return null;
-  // If it's already a URL (Cloudinary), use it
+  
+  // Check for Cloudinary secure_url (this is the full HTTPS URL)
+  if (file.secure_url) return file.secure_url;
+  
+  // If it's already a full URL (Cloudinary HTTP), use it
   if (file.path) return file.path;
   if (file.url) return file.url;
+  
+  // For disk storage, it returns just the filename
   return file.filename;
 };
 

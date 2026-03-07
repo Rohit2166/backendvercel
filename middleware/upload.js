@@ -1,26 +1,23 @@
 const multer = require("multer");
 const path = require("path");
 
-// Create a simple upload middleware that works without cloudinary
-// This avoids the "Cannot find module" error when importing
-
+// Create upload middleware with Cloudinary support
 let upload;
 let cloudinary = null;
 
-// Check if cloudinary can be loaded
-let cloudinaryConfigured = false;
-try {
-  cloudinaryConfigured = !!(
-    process.env.CLOUDINARY_CLOUD_NAME && 
-    process.env.CLOUDINARY_API_KEY && 
-    process.env.CLOUDINARY_API_SECRET
-  );
-} catch (e) {
-  console.log("Cloudinary check failed:", e.message);
-}
+// Check if cloudinary credentials are configured
+const cloudinaryConfigured = !!(
+  process.env.CLOUDINARY_CLOUD_NAME && 
+  process.env.CLOUDINARY_API_KEY && 
+  process.env.CLOUDINARY_API_SECRET
+);
 
-// Set up disk storage as default
-const storage = multer.diskStorage({
+console.log("Cloudinary check - Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME ? "Set" : "Not Set");
+console.log("Cloudinary check - API Key:", process.env.CLOUDINARY_API_KEY ? "Set" : "Not Set");
+console.log("Cloudinary check - API Secret:", process.env.CLOUDINARY_API_SECRET ? "Set" : "Not Set");
+
+// Set up disk storage as fallback
+const diskStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'uploads/');
   },
@@ -37,15 +34,16 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+// Default to disk storage first
 upload = multer({ 
-  storage: storage,
+  storage: diskStorage,
   fileFilter: fileFilter,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
   }
 });
 
-// Try to set up cloudinary if configured
+// Try to set up cloudinary
 if (cloudinaryConfigured) {
   try {
     const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -62,6 +60,7 @@ if (cloudinaryConfigured) {
       params: {
         folder: "cricbox",
         allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+        transformation: [{ width: 1200, height: 800, crop: "limit" }]
       },
     });
 
@@ -73,7 +72,7 @@ if (cloudinaryConfigured) {
       }
     });
     
-    console.log("✅ Cloudinary storage configured");
+    console.log("✅ Cloudinary storage configured successfully");
   } catch (err) {
     console.log("⚠️ Cloudinary setup failed, using disk storage:", err.message);
   }
