@@ -100,6 +100,7 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const mongoose = require("mongoose");
 
 dotenv.config();
 
@@ -117,6 +118,31 @@ try {
 }
 
 const app = express();
+
+
+// ================================
+// DATABASE CONNECTION
+// ================================
+let dbConnected = false;
+
+const connectDB = async () => {
+  if (dbConnected) return true;
+  
+  if (!process.env.MONGO_URI) {
+    console.log("⚠️ MONGO_URI not set in environment variables");
+    return false;
+  }
+  
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    dbConnected = true;
+    console.log("✅ MongoDB Connected");
+    return true;
+  } catch (err) {
+    console.error("❌ MongoDB connection error:", err.message);
+    return false;
+  }
+};
 
 
 // ================================
@@ -160,19 +186,35 @@ try {
 
 
 // ================================
-// TEST ROUTES (NO DB REQUIRED)
+// TEST ROUTES
 // ================================
 app.get("/", (req, res) => {
   res.send("CRICBOX Backend Running Successfully 🚀");
 });
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (req, res) => {
+  const dbOk = await connectDB();
   res.json({
     status: "ok",
     message: "Backend is running",
     mongoUri: !!process.env.MONGO_URI,
+    dbConnected: dbOk,
     timestamp: new Date().toISOString()
   });
+});
+
+
+// ================================
+// DATABASE MIDDLEWARE
+// ================================
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("Database error:", error.message);
+    res.status(500).json({ message: "Database connection failed" });
+  }
 });
 
 
@@ -191,8 +233,9 @@ if (contactRoutes) app.use("/api/contact", contactRoutes);
 // ================================
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log("Server running on port", PORT);
+    await connectDB();
   });
 }
 
