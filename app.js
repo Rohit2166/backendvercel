@@ -148,12 +148,12 @@ const connectDB = async () => {
 // ================================
 // CORS CONFIG
 // ================================
-// Allow all origins for Vercel deployment - simpler configuration
+// Allow all origins for Vercel deployment
+// Note: Cannot use credentials: true with origin: "*" in browsers
 app.use(cors({
-  origin: "*",
+  origin: true, // Reflect the request origin
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 
