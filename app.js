@@ -156,9 +156,6 @@ app.use(cors({
   credentials: true
 }));
 
-// Explicitly handle OPTIONS requests for preflight
-app.options("*", cors());
-
 
 // ================================
 // BODY PARSER
