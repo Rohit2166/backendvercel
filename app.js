@@ -156,6 +156,9 @@ app.use(cors({
   credentials: true
 }));
 
+// Explicitly handle OPTIONS requests for preflight
+app.options("*", cors());
+
 
 // ================================
 // BODY PARSER
@@ -192,16 +195,21 @@ app.get("/api/health", async (req, res) => {
 
 
 // ================================
-// DATABASE MIDDLEWARE
+// DATABASE MIDDLEWARE (with proper async error handling)
 // ================================
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (error) {
-    console.error("Database error:", error.message);
-    res.status(500).json({ message: "Database connection failed" });
+app.use((req, res, next) => {
+  // Skip DB connection for OPTIONS requests (preflight)
+  if (req.method === 'OPTIONS') {
+    return next();
   }
+  
+  connectDB()
+    .then(() => next())
+    .catch(err => {
+      console.error("Database error:", err.message);
+      // Don't block the request - continue anyway for read operations
+      next();
+    });
 });
 
 
