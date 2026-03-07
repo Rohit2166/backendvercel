@@ -35,8 +35,7 @@ if (cloudName && apiKey && apiSecret) {
       cloudinary: cloudinary,
       params: {
         folder: "cricbox",
-        allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
-        transformation: [{ width: 1200, height: 1200, crop: "limit" }]
+        allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"]
       },
     });
 
@@ -44,7 +43,7 @@ if (cloudName && apiKey && apiSecret) {
       storage: cloudStorage,
       fileFilter: fileFilter,
       limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB
+        fileSize: 5 * 1024 * 1024, // Reduced to 5MB for Vercel compatibility
       }
     });
     
@@ -64,13 +63,12 @@ if (cloudName && apiKey && apiSecret) {
       storage: diskStorage,
       fileFilter: fileFilter,
       limits: {
-        fileSize: 10 * 1024 * 1024,
+        fileSize: 5 * 1024 * 1024,
       }
     });
   }
 } else {
-  console.log("⚠️ Cloudinary credentials not found - using disk storage (may not work on Vercel)");
-  // Still set up disk storage as fallback for local development
+  console.log("⚠️ Cloudinary credentials not found - using disk storage");
   const diskStorage = multer.diskStorage({
     destination: function (req, file, cb) {
       cb(null, 'uploads/');
@@ -83,7 +81,7 @@ if (cloudName && apiKey && apiSecret) {
     storage: diskStorage,
     fileFilter: fileFilter,
     limits: {
-      fileSize: 10 * 1024 * 1024,
+      fileSize: 5 * 1024 * 1024,
     }
   });
 }

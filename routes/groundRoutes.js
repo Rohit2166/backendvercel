@@ -33,18 +33,33 @@ const getImageUrl = (file) => {
 };
 
 // Add ground with image upload (owner only)
-router.post("/add", auth, upload.array("images", 5), async (req, res) => {
+router.post("/add", auth, (req, res, next) => {
+  // Custom handler to catch multer errors
+  upload.array("images", 5)(req, res, (err) => {
+    if (err) {
+      console.error("Multer error:", err.message);
+      // Continue without files if there's an error
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ message: "File too large. Max 5MB allowed." });
+      }
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     // Validate userId is a valid ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.userId)) {
       return res.status(400).json({ message: "Invalid user ID" });
     }
     
-    // Get image URLs if files were uploaded (Cloudinary returns path as URL)
-    const images = req.files ? req.files.map(file => getImageUrl(file)) : [];
+    // Get image URLs if files were uploaded
+    let images = [];
+    if (req.files && req.files.length > 0) {
+      images = req.files.map(file => getImageUrl(file)).filter(url => url !== null);
+    }
     
     console.log("Creating ground with ownerId:", req.userId);
-    console.log("Images uploaded:", images);
+    console.log("Images uploaded:", images.length);
     
     // Ensure ownerId is a proper ObjectId
     const ownerIdObject = new mongoose.Types.ObjectId(req.userId);
@@ -55,12 +70,12 @@ router.post("/add", auth, upload.array("images", 5), async (req, res) => {
       images: images
     });
     
-    console.log("Ground created:", ground._id, "ownerId:", ground.ownerId);
+    console.log("Ground created:", ground._id);
     
     res.json(ground);
   } catch (error) {
     console.error("Error creating ground:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: error.message || "Failed to create ground" });
   }
 });
 
