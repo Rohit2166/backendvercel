@@ -1,29 +1,34 @@
 const multer = require("multer");
-const cloudinary = require("cloudinary").v2;
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const path = require("path");
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// Create a simple upload middleware that works without cloudinary
+// This avoids the "Cannot find module" error when importing
 
-// Configure Cloudinary storage
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "cricbox",
-    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
-    transformation: [
-      { width: 1200, height: 800, crop: "limit" },
-      { quality: "auto:good" },
-    ],
+let upload;
+let cloudinary = null;
+
+// Check if cloudinary can be loaded
+let cloudinaryConfigured = false;
+try {
+  cloudinaryConfigured = !!(
+    process.env.CLOUDINARY_CLOUD_NAME && 
+    process.env.CLOUDINARY_API_KEY && 
+    process.env.CLOUDINARY_API_SECRET
+  );
+} catch (e) {
+  console.log("Cloudinary check failed:", e.message);
+}
+
+// Set up disk storage as default
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/');
   },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname));
+  }
 });
 
-// File filter to accept images only
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith("image/")) {
     cb(null, true);
@@ -32,13 +37,52 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({
+upload = multer({ 
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
+    fileSize: 10 * 1024 * 1024, // 10MB
+  }
 });
 
-// Export both upload and cloudinary for use in other files
-module.exports = { upload, cloudinary };
+// Try to set up cloudinary if configured
+if (cloudinaryConfigured) {
+  try {
+    const { CloudinaryStorage } = require("multer-storage-cloudinary");
+    cloudinary = require("cloudinary").v2;
+    
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+
+    const cloudStorage = new CloudinaryStorage({
+      cloudinary: cloudinary,
+      params: {
+        folder: "cricbox",
+        allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+      },
+    });
+
+    upload = multer({ 
+      storage: cloudStorage,
+      fileFilter: fileFilter,
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      }
+    });
+    
+    console.log("✅ Cloudinary storage configured");
+  } catch (err) {
+    console.log("⚠️ Cloudinary setup failed, using disk storage:", err.message);
+  }
+} else {
+  console.log("⚠️ Cloudinary not configured - using disk storage");
+}
+
+// Export for both default and named exports
+module.exports = upload;
+module.exports.upload = upload;
+module.exports.cloudinary = cloudinary;
+
