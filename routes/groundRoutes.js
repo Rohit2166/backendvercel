@@ -33,29 +33,30 @@ const getImageUrl = (file) => {
 };
 
 // Add ground with image upload (owner only)
-router.post("/add", auth, (req, res, next) => {
-  // Custom handler to catch multer errors
-  upload.array("images", 5)(req, res, (err) => {
-    if (err) {
-      console.error("Multer error:", err.message);
-      // Continue without files if there's an error
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ message: "File too large. Max 5MB allowed." });
-      }
-    }
-    next();
-  });
-}, async (req, res) => {
+router.post("/add", auth, async (req, res) => {
   try {
     // Validate userId is a valid ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.userId)) {
       return res.status(400).json({ message: "Invalid user ID" });
     }
     
-    // Get image URLs if files were uploaded
+    // Get base64 images from body and upload to Cloudinary
     let images = [];
-    if (req.files && req.files.length > 0) {
-      images = req.files.map(file => getImageUrl(file)).filter(url => url !== null);
+    if (req.body.images && Array.isArray(req.body.images)) {
+      for (const base64Image of req.body.images) {
+        try {
+          if (base64Image && base64Image.startsWith('data:')) {
+            // Upload to Cloudinary directly
+            const uploadResponse = await cloudinary.uploader.upload(base64Image, {
+              folder: "cricbox",
+              resource_type: "image"
+            });
+            images.push(uploadResponse.secure_url);
+          }
+        } catch (uploadErr) {
+          console.error("Image upload error:", uploadErr.message);
+        }
+      }
     }
     
     console.log("Creating ground with ownerId:", req.userId);
