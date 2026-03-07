@@ -148,25 +148,12 @@ const connectDB = async () => {
 // ================================
 // CORS CONFIG
 // ================================
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-];
-
+// Allow all origins for Vercel deployment - simpler configuration
 app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      if (origin.includes('.vercel.app')) {
-        return callback(null, true);
-      }
-      const msg = 'CORS not allowed';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
+  origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
 }));
 
 
