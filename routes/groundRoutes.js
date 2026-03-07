@@ -6,32 +6,6 @@ const mongoose = require("mongoose");
 
 const auth = require("../middleware/authMiddleware");
 
-const { upload, cloudinary } = require("../middleware/upload");
-
-// Helper function to get image URL from Cloudinary file
-const getImageUrl = (file) => {
-  if (!file) return null;
-  
-  // Check for Cloudinary secure_url (this is the full HTTPS URL)
-  if (file.secure_url) return file.secure_url;
-  
-  // If it's already a full URL (Cloudinary HTTP), use it
-  if (file.url) return file.url;
-  
-  // For disk storage, it returns just the filename - need to construct URL
-  if (file.filename) {
-    // Check if it's a full path or just a filename
-    if (file.path && file.path.startsWith('http')) {
-      return file.path;
-    }
-    // For disk storage on Vercel, this won't work - return null
-    // Only Cloudinary URLs will work on Vercel
-    return null;
-  }
-  
-  return null;
-};
-
 // Add ground with image upload (owner only)
 router.post("/add", auth, async (req, res) => {
   try {
@@ -40,33 +14,28 @@ router.post("/add", auth, async (req, res) => {
       return res.status(400).json({ message: "Invalid user ID" });
     }
     
-    // Get base64 images from body and upload to Cloudinary
+    // Get base64 images from body - store directly in DB
     let images = [];
     if (req.body.images && Array.isArray(req.body.images)) {
-      for (const base64Image of req.body.images) {
-        try {
-          if (base64Image && base64Image.startsWith('data:')) {
-            // Upload to Cloudinary directly
-            const uploadResponse = await cloudinary.uploader.upload(base64Image, {
-              folder: "cricbox",
-              resource_type: "image"
-            });
-            images.push(uploadResponse.secure_url);
-          }
-        } catch (uploadErr) {
-          console.error("Image upload error:", uploadErr.message);
-        }
-      }
+      // Store base64 images directly
+      images = req.body.images.filter(img => img && img.startsWith('data:'));
+      // Limit to 5 images max
+      images = images.slice(0, 5);
     }
     
     console.log("Creating ground with ownerId:", req.userId);
-    console.log("Images uploaded:", images.length);
+    console.log("Images received:", images.length);
     
     // Ensure ownerId is a proper ObjectId
     const ownerIdObject = new mongoose.Types.ObjectId(req.userId);
     
     const ground = await Ground.create({
-      ...req.body,
+      name: req.body.name,
+      location: req.body.location,
+      address: req.body.address,
+      sport: req.body.sport,
+      price: req.body.price,
+      description: req.body.description,
       ownerId: ownerIdObject,
       images: images
     });
@@ -158,15 +127,15 @@ router.get("/:id", async (req, res) => {
 });
 
 
-// Update ground with image upload
-router.put("/:id", auth, upload.array("images", 5), async (req, res) => {
+// Update ground
+router.put("/:id", auth, async (req, res) => {
   try {
     const ground = await Ground.findById(req.params.id);
     if (!ground) {
       return res.status(404).json({ message: "Ground not found" });
     }
     
-    // Check ownership - handle both ObjectId and string
+    // Check ownership
     let ownerId = null;
     if (ground.ownerId) {
       ownerId = ground.ownerId.toString();
@@ -178,18 +147,24 @@ router.put("/:id", auth, upload.array("images", 5), async (req, res) => {
       return res.status(403).json({ message: "Not authorized" });
     }
     
-    // Get new image URLs if files were uploaded
-    const newImages = req.files ? req.files.map(file => getImageUrl(file)) : [];
-    
-    // Merge with existing images if any
-    let updateData = { ...req.body };
-    if (newImages.length > 0) {
-      updateData.images = [...(ground.images || []), ...newImages];
+    // Get new base64 images if provided
+    let newImages = ground.images || [];
+    if (req.body.images && Array.isArray(req.body.images)) {
+      const base64Images = req.body.images.filter(img => img && img.startsWith('data:'));
+      newImages = [...newImages, ...base64Images].slice(0, 5);
     }
     
     const updatedGround = await Ground.findByIdAndUpdate(
       req.params.id,
-      updateData,
+      {
+        name: req.body.name,
+        location: req.body.location,
+        address: req.body.address,
+        sport: req.body.sport,
+        price: req.body.price,
+        description: req.body.description,
+        images: newImages
+      },
       { new: true }
     );
     res.json(updatedGround);
@@ -208,7 +183,7 @@ router.delete("/:id", auth, async (req, res) => {
       return res.status(404).json({ message: "Ground not found" });
     }
     
-    // Check ownership - handle both ObjectId and string
+    // Check ownership
     let ownerId = null;
     if (ground.ownerId) {
       ownerId = ground.ownerId.toString();
@@ -220,19 +195,6 @@ router.delete("/:id", auth, async (req, res) => {
       return res.status(403).json({ message: "Not authorized" });
     }
     
-    // Delete images from Cloudinary if they exist
-    if (ground.images && ground.images.length > 0) {
-      for (const imageUrl of ground.images) {
-        try {
-          // Extract public ID from Cloudinary URL
-          const publicId = imageUrl.split('/').pop().split('.')[0];
-          await cloudinary.uploader.destroy(`cricbox/${publicId}`);
-        } catch (err) {
-          console.error("Error deleting image from Cloudinary:", err);
-        }
-      }
-    }
-    
     await Ground.findByIdAndDelete(req.params.id);
     res.json({ message: "Ground deleted successfully" });
   } catch (error) {
@@ -242,41 +204,5 @@ router.delete("/:id", auth, async (req, res) => {
 });
 
 
-// Migration endpoint to fix existing grounds with string ownerId
-router.post("/migrate", auth, async (req, res) => {
-  try {
-    // Only allow owner users
-    const user = await User.findById(req.userId);
-    if (!user || (user.role !== "owner" && user.role !== "admin")) {
-      return res.status(403).json({ message: "Not authorized" });
-    }
-    
-    // Find all grounds with string ownerId
-    const invalidGrounds = await Ground.find({ 
-      ownerId: { $type: "string" }
-    });
-    
-    console.log(`Found ${invalidGrounds.length} grounds with string ownerId`);
-    
-    // Update each ground to set ownerId to null
-    let updatedCount = 0;
-    for (const ground of invalidGrounds) {
-      if (ground.ownerId === "owner" || ground.ownerId === "") {
-        ground.ownerId = null;
-        await ground.save();
-        updatedCount++;
-      }
-    }
-    
-    res.json({ 
-      message: "Migration completed", 
-      updatedCount 
-    });
-  } catch (error) {
-    console.error("Migration error:", error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-
 module.exports = router;
+
