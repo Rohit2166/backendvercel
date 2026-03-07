@@ -157,16 +157,33 @@ app.use("/uploads", express.static("uploads"));
 
 
 // ================================
-// TEST ROUTE
+// TEST ROUTE & HEALTH CHECK
 // ================================
 app.get("/", (req, res) => {
   res.send("CRICBOX Backend Running Successfully 🚀");
+});
+
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  const mongoUri = process.env.MONGO_URI;
+  res.json({
+    status: "ok",
+    message: "Backend is running",
+    mongoConfigured: !!mongoUri,
+    timestamp: new Date().toISOString()
+  });
 });
 
 
 // ================================
 // DATABASE CONNECTION
 // ================================
+
+// Check if MONGO_URI is configured
+const MONGO_URI = process.env.MONGO_URI;
+if (!MONGO_URI) {
+  console.error("⚠️ MONGO_URI is not defined in environment variables!");
+}
 
 let cached = global.mongoose;
 
@@ -175,6 +192,11 @@ if (!cached) {
 }
 
 const connectDB = async () => {
+  
+  // Check if MONGO_URI is available
+  if (!MONGO_URI) {
+    throw new Error("MONGO_URI is not configured. Please set MONGO_URI environment variable in Vercel dashboard.");
+  }
 
   if (cached.conn) {
     return cached.conn;
@@ -186,10 +208,14 @@ const connectDB = async () => {
       bufferCommands: false,
     };
 
-    cached.promise = mongoose.connect(process.env.MONGO_URI, opts)
+    cached.promise = mongoose.connect(MONGO_URI, opts)
       .then((mongoose) => {
         console.log("MongoDB Connected");
         return mongoose;
+      })
+      .catch((err) => {
+        console.error("MongoDB Connection Error:", err.message);
+        throw err;
       });
   }
 
