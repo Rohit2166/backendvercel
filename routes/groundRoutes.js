@@ -183,23 +183,34 @@ router.put("/:id", auth, async (req, res) => {
       return res.status(403).json({ message: "Not authorized" });
     }
     
-    // Get new images if provided (upload to Cloudinary)
-    let newImages = ground.images || [];
+    // Process images - handle both existing URLs and new base64 images
+    let finalImages = [];
+    
     if (req.body.images && Array.isArray(req.body.images)) {
-      for (const base64Image of req.body.images) {
-        try {
-          if (base64Image && base64Image.startsWith('data:')) {
-            const uploadResponse = await cloudinary.uploader.upload(base64Image, {
+      for (const img of req.body.images) {
+        if (!img) continue;
+        
+        // If it's already a Cloudinary URL or http URL, keep it as is
+        if (img.startsWith('http://') || img.startsWith('https://')) {
+          finalImages.push(img);
+        }
+        // If it's a new base64 image, upload to Cloudinary
+        else if (img.startsWith('data:')) {
+          try {
+            const uploadResponse = await cloudinary.uploader.upload(img, {
               folder: "cricbox",
-              resource_type: "image"
+              resource_type: "image",
+              timeout: 120000
             });
-            newImages.push(uploadResponse.secure_url);
+            finalImages.push(uploadResponse.secure_url);
+          } catch (uploadErr) {
+            console.error("Image upload error:", uploadErr.message);
           }
-        } catch (uploadErr) {
-          console.error("Image upload error:", uploadErr.message);
         }
       }
     }
+    
+    console.log("Updating ground with images:", finalImages.length);
     
     const updatedGround = await Ground.findByIdAndUpdate(
       req.params.id,
@@ -210,7 +221,7 @@ router.put("/:id", auth, async (req, res) => {
         sport: req.body.sport,
         price: req.body.price,
         description: req.body.description,
-        images: newImages.slice(0, 5)
+        images: finalImages.slice(0, 5)
       },
       { new: true }
     );
