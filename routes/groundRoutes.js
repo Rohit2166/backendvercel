@@ -5,29 +5,65 @@ const User = require("../models/User");
 const mongoose = require("mongoose");
 
 const auth = require("../middleware/authMiddleware");
+const cloudinary = require("cloudinary").v2;
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "demo",
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 // Add ground with image upload (owner only)
-router.post("/add", auth, async (req, res) => {
+router.post("/add", async (req, res) => {
   try {
+    // Get auth token from header
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+    
+    const token = authHeader.split(" ")[1];
+    const jwt = require("jsonwebtoken");
+    const secret = process.env.JWT_SECRET || "defaultsecretkey";
+    
+    let userId;
+    try {
+      const decoded = jwt.verify(token, secret);
+      userId = decoded.id;
+    } catch (err) {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+    
     // Validate userId is a valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(req.userId)) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: "Invalid user ID" });
     }
     
-    // Get base64 images from body - store directly in DB
+    // Get base64 images from body and upload to Cloudinary
     let images = [];
     if (req.body.images && Array.isArray(req.body.images)) {
-      // Store base64 images directly
-      images = req.body.images.filter(img => img && img.startsWith('data:'));
-      // Limit to 5 images max
-      images = images.slice(0, 5);
+      for (const base64Image of req.body.images) {
+        try {
+          if (base64Image && base64Image.startsWith('data:')) {
+            // Upload to Cloudinary
+            const uploadResponse = await cloudinary.uploader.upload(base64Image, {
+              folder: "cricbox",
+              resource_type: "image",
+              timeout: 120000
+            });
+            images.push(uploadResponse.secure_url);
+          }
+        } catch (uploadErr) {
+          console.error("Image upload error:", uploadErr.message);
+        }
+      }
     }
     
-    console.log("Creating ground with ownerId:", req.userId);
-    console.log("Images received:", images.length);
+    console.log("Creating ground with ownerId:", userId);
+    console.log("Images uploaded to Cloudinary:", images.length);
     
-    // Ensure ownerId is a proper ObjectId
-    const ownerIdObject = new mongoose.Types.ObjectId(req.userId);
+    const ownerIdObject = new mongoose.Types.ObjectId(userId);
     
     const ground = await Ground.create({
       name: req.body.name,
@@ -147,11 +183,22 @@ router.put("/:id", auth, async (req, res) => {
       return res.status(403).json({ message: "Not authorized" });
     }
     
-    // Get new base64 images if provided
+    // Get new images if provided (upload to Cloudinary)
     let newImages = ground.images || [];
     if (req.body.images && Array.isArray(req.body.images)) {
-      const base64Images = req.body.images.filter(img => img && img.startsWith('data:'));
-      newImages = [...newImages, ...base64Images].slice(0, 5);
+      for (const base64Image of req.body.images) {
+        try {
+          if (base64Image && base64Image.startsWith('data:')) {
+            const uploadResponse = await cloudinary.uploader.upload(base64Image, {
+              folder: "cricbox",
+              resource_type: "image"
+            });
+            newImages.push(uploadResponse.secure_url);
+          }
+        } catch (uploadErr) {
+          console.error("Image upload error:", uploadErr.message);
+        }
+      }
     }
     
     const updatedGround = await Ground.findByIdAndUpdate(
@@ -163,7 +210,7 @@ router.put("/:id", auth, async (req, res) => {
         sport: req.body.sport,
         price: req.body.price,
         description: req.body.description,
-        images: newImages
+        images: newImages.slice(0, 5)
       },
       { new: true }
     );
@@ -193,6 +240,19 @@ router.delete("/:id", auth, async (req, res) => {
     
     if (ownerId && userIdStr && ownerId !== userIdStr && ownerId !== "owner") {
       return res.status(403).json({ message: "Not authorized" });
+    }
+    
+    // Delete images from Cloudinary if they exist
+    if (ground.images && ground.images.length > 0) {
+      for (const imageUrl of ground.images) {
+        try {
+          // Extract public ID from Cloudinary URL
+          const publicId = imageUrl.split('/').pop().split('.')[0];
+          await cloudinary.uploader.destroy(`cricbox/${publicId}`);
+        } catch (err) {
+          console.error("Error deleting image from Cloudinary:", err);
+        }
+      }
     }
     
     await Ground.findByIdAndDelete(req.params.id);
