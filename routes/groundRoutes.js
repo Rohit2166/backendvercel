@@ -42,6 +42,8 @@ router.post("/add", async (req, res) => {
     
     // Get base64 images from body and upload to Cloudinary
     let images = [];
+    console.log("Received images in request:", req.body.images);
+    
     if (req.body.images && Array.isArray(req.body.images)) {
       for (const base64Image of req.body.images) {
         try {
@@ -53,15 +55,20 @@ router.post("/add", async (req, res) => {
               timeout: 120000
             });
             images.push(uploadResponse.secure_url);
+            console.log("Uploaded to Cloudinary:", uploadResponse.secure_url);
+          } else if (base64Image && base64Image.startsWith('http')) {
+            // Already a URL, use it directly
+            images.push(base64Image);
           }
         } catch (uploadErr) {
           console.error("Image upload error:", uploadErr.message);
+          // If Cloudinary fails, try to save the base64 directly (not recommended for production but helps debug)
+          images.push(base64Image);
         }
       }
     }
     
-    console.log("Creating ground with ownerId:", userId);
-    console.log("Images uploaded to Cloudinary:", images.length);
+    console.log("Final images array:", images);
     
     const ownerIdObject = new mongoose.Types.ObjectId(userId);
     
