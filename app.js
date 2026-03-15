@@ -7,9 +7,9 @@ dotenv.config();
 
 const app = express();
 
-// ================================
+
 // IMPORT ROUTES
-// ================================
+
 let userRoutes, groundRoutes, turfRoutes, bookingRoutes, contactRoutes;
 
 try {
@@ -22,9 +22,9 @@ try {
   console.error("Error loading routes:", err.message);
 }
 
-// ================================
+
 // DATABASE CONNECTION
-// ================================
+
 let dbConnected = false;
 
 const connectDB = async () => {
@@ -46,29 +46,27 @@ const connectDB = async () => {
   }
 };
 
-// ================================
 // CORS CONFIG
-// ================================
+
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-// ================================
 // BODY PARSER
-// ================================
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// ================================
+
 // STATIC FILES
-// ================================
+
 app.use("/uploads", express.static("uploads"));
 
-// ================================
+
 // TEST ROUTES
-// ================================
+
 app.get("/", (req, res) => {
   res.send("CRICBOX Backend Running Successfully 🚀");
 });
@@ -85,9 +83,9 @@ app.get("/api/health", async (req, res) => {
   });
 });
 
-// ================================
+
 // DATABASE MIDDLEWARE
-// ================================
+
 app.use(async (req, res, next) => {
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
@@ -102,18 +100,18 @@ app.use(async (req, res, next) => {
   }
 });
 
-// ================================
+
 // API ROUTES
-// ================================
+
 if (userRoutes) app.use("/api/users", userRoutes);
 if (groundRoutes) app.use("/api/grounds", groundRoutes);
 if (turfRoutes) app.use("/api/turfs", turfRoutes);
 if (bookingRoutes) app.use("/api/bookings", bookingRoutes);
 if (contactRoutes) app.use("/api/contact", contactRoutes);
 
-// ================================
+
 // LOCAL SERVER RUN
-// ================================
+
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 5000;
 
@@ -123,8 +121,8 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-// ================================
+
 // EXPORT FOR VERCEL
-// ================================
+
 module.exports = app;
 
